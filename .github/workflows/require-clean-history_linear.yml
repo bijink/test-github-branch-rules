@@ -1,0 +1,36 @@
+name: Require clean history 
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-source-history-linear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch target branch
+        run: git fetch origin ${{ github.base_ref }}
+
+      - name: Verify history
+        run: |
+          TARGET_BRANCH="${{ github.base_ref }}"
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          
+          # RANGE compares the fetched target branch against the current checked-out PR commit (HEAD)
+          RANGE="origin/$TARGET_BRANCH..origin/$SOURCE_BRANCH"
+
+          MERGES=$(git rev-list --min-parents=2 "$RANGE")
+
+          if [ -n "$MERGES" ]; then
+            echo "::error::Non-linear history: Merge commits detected."
+            echo "$MERGES"
+            exit 1
+          fi
+          
+          echo "Linear history confirmed."
