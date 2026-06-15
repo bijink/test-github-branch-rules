@@ -1,4 +1,4 @@
-name: Require clean history 
+name: Require Clean History 2 
 
 on:
   pull_request:
