@@ -2,6 +2,7 @@ name: Branch Protection Check
 
 on:
   pull_request:
+    branches: [main, staging]
     types: [opened, synchronize, reopened]
 
 jobs:
