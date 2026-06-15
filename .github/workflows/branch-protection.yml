@@ -1,0 +1,27 @@
+name: Branch Protection Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-branch-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify allowed source branch for target
+        run: |
+          TARGET="${{ github.base_ref }}"
+          SOURCE="${{ github.head_ref }}"
+
+          echo "Target branch: $TARGET"
+          echo "Source branch: $SOURCE"
+
+          if [ "$TARGET" = "main" ] && [ "$SOURCE" != "staging" ]; then
+            echo "❌ Error: Pull requests to 'main' are only allowed from 'staging'."
+            exit 1
+          elif [ "$TARGET" = "staging" ] && [ "$SOURCE" != "develop" ]; then
+            echo "❌ Error: Pull requests to 'staging' are only allowed from 'develop'."
+            exit 1
+          else
+            echo "✅ Branch flow is valid."
+          fi
