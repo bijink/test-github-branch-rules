@@ -1,1 +1,1 @@
-# test-github-branch-rules 3.1
+# test-github-branch-rules 3.2
