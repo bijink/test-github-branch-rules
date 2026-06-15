@@ -1,0 +1,71 @@
+name: Require clean history 
+
+on:
+  pull_request:
+    branches: [main, staging]
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-source-history-base:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+
+      - name: Verify Oldest Commit is not a Merge
+        run: |
+          TARGET_BRANCH="${{ github.base_ref }}"
+          SOURCE_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          echo "🏁 Target Branch: origin/$TARGET_BRANCH"
+          echo "🌿 Source Branch Tip: $SOURCE_SHA"
+          
+          git fetch origin $TARGET_BRANCH
+          
+          # 1. Get the list of commits, reverse it to find the oldest
+          PR_COMMITS=$(git log origin/$TARGET_BRANCH..$SOURCE_SHA --format="%H")
+          FIRST_COMMIT=$(echo "$PR_COMMITS" | tail -n 1)
+          
+          if [ -z "$FIRST_COMMIT" ]; then
+            echo "✅ SUCCESS: No new unique commits found to validate."
+            exit 0
+          fi
+          
+          echo "🆕 Evaluating oldest PR commit: $FIRST_COMMIT"
+          
+          # 2. Check parent count of first commit
+          # Standard commit: 1 parent (outputs 2 words: COMMIT PARENT)
+          # Merge commit: 2+ parents (outputs 3+ words: COMMIT PARENT1 PARENT2)
+          PARENT_COUNT=$(git rev-list --parents -n 1 $FIRST_COMMIT | wc -w)
+          
+          if [ "$PARENT_COUNT" -gt 2 ]; then
+            COMMIT_MSG=$(git log -1 --format="%s" $FIRST_COMMIT)
+            
+            echo "::error title=PR Architecture Violation::The base commit of this branch ($FIRST_COMMIT) is a merge commit."
+            echo "=========================================================================="
+            echo "❌ ERROR: PR Architecture Violation!"
+            echo "=========================================================================="
+            echo "The very first commit of your branch is a merge commit:"
+            echo "  Hash:    $FIRST_COMMIT"
+            echo "  Message: \"$COMMIT_MSG\""
+            echo "=========================================================================="
+            echo "💡 HINT: HOW TO FIX THIS"
+            echo "=========================================================================="
+            echo "You pulled changes using 'git merge' or branched from an unaligned track."
+            echo "To make your branch history strictly linear, clean it up with a rebase:"
+            echo ""
+            echo "  1. Fetch latest changes from the remote:"
+            echo "     git fetch origin $TARGET_BRANCH"
+            echo ""
+            echo "  2. Rebase your branch on top of the correct target branch:"
+            echo "     git rebase origin/$TARGET_BRANCH"
+            echo ""
+            echo "  3. Force push the changes to the source branch (your branch):"
+            echo "     git push origin HEAD --force-with-lease"
+            echo "=========================================================================="
+            exit 1
+          else
+            echo "✅ SUCCESS: The base of your branch is a clean, non-merge commit."
+          fi
